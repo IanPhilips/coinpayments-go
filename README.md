@@ -6,7 +6,7 @@ Tested on Go 1.7 and 1.8.
 
 ## Installation
 
-`go get github.com/yograterol/coinpayments-go`
+`go get github.com/ianphilips/coinpayments-go`
 
 ## Usage
 
