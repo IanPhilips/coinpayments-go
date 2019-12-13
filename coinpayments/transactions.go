@@ -3,8 +3,8 @@ package coinpayments
 import (
 	"net/http"
 
-	"fmt"
-
+	//"fmt"
+	"strings"
 	"github.com/dghubble/sling"
 )
 
@@ -27,6 +27,11 @@ type Transaction struct {
 type TransactionResponse struct {
 	Error  string       `json:"error"`
 	Result *Transaction `json:"result"`
+}
+
+type TransactionResponseError struct {
+	Error  string       `json:"error"`
+	Result []*Transaction `json:"result"`
 }
 
 type TransactionParams struct {
@@ -61,15 +66,33 @@ func (s *TransactionService) getHMAC() string {
 	return getHMAC(getPayload(s.Params))
 }
 
+// TODO: if we generate an error in the sling POST request, we get the error:
+// json: cannot unmarshal array into Go struct field TransactionResponse.result of type coinpayments.Transaction"
+// if you change TransactionResponse.Result to be of type []*Transaction then you can see the error message
+// but when we don't get an error, it is a single *Transaction and the slice will throw an error
 func (s *TransactionService) NewTransaction(transactionParams *TransactionParams) (TransactionResponse, *http.Response, error) {
 	transactionResponse := new(TransactionResponse)
 	s.Params.TransactionParams = *transactionParams
-	fmt.Println(getPayload(s.Params))
-	fmt.Println(getHMAC(getPayload(s.Params)))
+	//fmt.Println(getPayload(s.Params))
+	//fmt.Println(getHMAC(getPayload(s.Params)))
+
 	resp, err := s.sling.New().Set("HMAC", s.getHMAC()).Post(
 		"api.php").BodyForm(s.Params).ReceiveSuccess(transactionResponse)
+
+	// a bit of a hack - we should use a different post method, but catches errors with minimal effort
+	if err!= nil && strings.Contains(err.Error(), "json"){
+		transactionResponseError := new(TransactionResponseError)
+		resp, err := s.sling.New().Set("HMAC", s.getHMAC()).Post(
+			"api.php").BodyForm(s.Params).ReceiveSuccess(transactionResponseError)
+		transactionResponse.Error = transactionResponseError.Error
+		return *transactionResponse, resp, err
+	}
+
 	return *transactionResponse, resp, err
 }
+
+
+
 
 func (s *TransactionService) getParams() {
 	s.Params.Command = "create_transaction"
